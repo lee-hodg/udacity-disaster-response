@@ -13,6 +13,7 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.feature_extraction.text import CountVectorizer, TfidfTransformer
 from sklearn.pipeline import Pipeline
 from sklearn.metrics import classification_report
+from sklearn.model_selection import GridSearchCV
 
 nltk.download(['punkt', 'wordnet'])
 
@@ -64,7 +65,20 @@ def build_model():
                 ('tfidf', TfidfTransformer()),
                 ('clf', MultiOutputClassifier(RandomForestClassifier()))
                 ])
-    return pipeline
+
+    # How should I choose these?
+    parameters = {
+        #'vect__ngram_range': ((1, 1), (1, 2)),
+        #'vect__max_df': (0.5, 0.75, 1.0),
+        #'vect__max_features': (None, 5000, 10000),
+        'tfidf__use_idf': (True, False),
+        'clf__estimator__min_samples_split': [2, 3, 4],
+        'clf__estimator__n_estimators': [10, 20],
+    }
+
+    cv = GridSearchCV(pipeline, param_grid=parameters, n_jobs=-1)
+
+    return cv
 
 
 def evaluate_model(model, x_test, y_test, category_names):
@@ -110,6 +124,9 @@ def main():
         
         print('Training model...')
         model.fit(x_train, y_train)
+
+        print('Grid cv results...')
+        print(sorted(model.cv_results_.keys()))
         
         print('Evaluating model...')
         evaluate_model(model, x_test, y_test, category_names)
