@@ -9,12 +9,9 @@ def load_data(messages_filepath, categories_filepath):
     Merge them on `id` column with an inner join. Each id in the left frame
     corresponds to one in the right frame so "inner" join is fine.
 
-    Args:
-        messages_filepath: the path on disk for the messages CSV
-        categories_filepath: the path on disk for the categories CSV
-
-    Returns:
-        The pandas dataframe created by merging the 2 datasets
+    :param messages_filepath: the path on disk for the messages CSV
+    :param categories_filepath: the path on disk for the categories CSV
+    :return: The pandas dataframe created by merging the 2 datasets
     """
     messages = pd.read_csv(messages_filepath)
     categories = pd.read_csv(categories_filepath)
@@ -27,17 +24,15 @@ def clean_data(df):
     We want to one-hot encode the categories ultimately having each as its own column and each row with a 0/1
     if that example belongs to the category.
 
-    We needed to merge initially to ensure categories matched with messages, but now we form a new categories df 
+    We needed to merge initially to ensure categories matched with messages, but now we form a new categories df
     from the merged df categories column, splitting the categories on ';', creating column names, and then retaining
     only the binary 0/1 in as the row values. We finally drop the categories column in the original df and concat our
     new one-hot encoded categories df with it.
 
-    Args:
-        df: the dataframe from load_data()
-    Return:
-        A new pandas dataframe with our categories one-hot encoded.
-    """
 
+    :param df: the dataframe from load_data()
+    :return: A new pandas dataframe with our categories one-hot encoded.
+    """
     # We split the categories on the ; delimiter expanding into their own columns with expand=True
     categories = df.categories.str.split(';', expand=True)
 
@@ -79,11 +74,9 @@ def save_data(df, database_filename):
     """
     Save the pandas dataframe `df` to an sqlite database with filename `database_filename`
 
-    Args:
-        df: pandas dataframe to be saved
-        database_filename: string database filename
-    Returns:
-        None
+    :param df: pandas dataframe to be saved
+    :param database_filename: string database filename
+    :return: None
     """
     engine = create_engine(f'sqlite:///{database_filename}')
     df.to_sql('InsertTableName', engine, index=False)  
