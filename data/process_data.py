@@ -22,16 +22,15 @@ def load_data(messages_filepath, categories_filepath):
     return df
 
 
-
 def clean_data(df):
     """
     We want to one-hot encode the categories ultimately having each as its own column and each row with a 0/1
     if that example belongs to the category.
 
     We needed to merge initially to ensure categories matched with messages, but now we form a new categories df 
-    from the merged df categories column, splitting the categories on ';', creating column names, and then retaining only
-    the binary 0/1 in as the row values. We finally drop the categories column in the original df and concat our new
-    one-hot encoded categories df with it.
+    from the merged df categories column, splitting the categories on ';', creating column names, and then retaining
+    only the binary 0/1 in as the row values. We finally drop the categories column in the original df and concat our
+    new one-hot encoded categories df with it.
 
     Args:
         df: the dataframe from load_data()
@@ -43,10 +42,10 @@ def clean_data(df):
     categories = df.categories.str.split(';', expand=True)
 
     # Take the first row and remove the -N from each category to serve as column names
-    row =  categories.iloc[0, :]
+    row = categories.iloc[0, :]
     # use this row to extract a list of new column names for categories.
-    category_colnames =  categories.iloc[0, :].apply(lambda x: x[:-2]).values
-    categories.columns = category_colnames`
+    category_column_names = row.apply(lambda x: x[:-2]).values
+    categories.columns = category_column_names
 
     # For each column we want the row values to be just the binary numeric part 1/0
     for column in categories:
@@ -78,11 +77,11 @@ def clean_data(df):
 
 def save_data(df, database_filename):
     """
-    Save the pandas dataframe `df` to an sqlite datbase with filename `database_filename`
+    Save the pandas dataframe `df` to an sqlite database with filename `database_filename`
 
     Args:
         df: pandas dataframe to be saved
-        database_filename: string database filenmae
+        database_filename: string database filename
     Returns:
         None
     """
@@ -95,8 +94,7 @@ def main():
 
         messages_filepath, categories_filepath, database_filepath = sys.argv[1:]
 
-        print('Loading data...\n    MESSAGES: {}\n    CATEGORIES: {}'
-              .format(messages_filepath, categories_filepath))
+        print(f'Loading data...\n    MESSAGES: {messages_filepath}\n    CATEGORIES: {categories_filepath}')
         df = load_data(messages_filepath, categories_filepath)
 
         print('Cleaning data...')
@@ -108,11 +106,10 @@ def main():
         print('Cleaned data saved to database!')
     
     else:
-        print('Please provide the filepaths of the messages and categories '\
-              'datasets as the first and second argument respectively, as '\
-              'well as the filepath of the database to save the cleaned data '\
-              'to as the third argument. \n\nExample: python process_data.py '\
-              'disaster_messages.csv disaster_categories.csv '\
+        print('Please provide the file paths of the messages and categories '
+              'datasets as the first and second argument respectively, as '
+              'well as the filepath of the database to save the cleaned data '
+              'disaster_messages.csv disaster_categories.csv '
               'DisasterResponse.db')
 
 
