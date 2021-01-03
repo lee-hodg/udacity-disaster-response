@@ -1,7 +1,8 @@
-import sys
 import pickle
 import pandas as pd
+import numpy as np
 import nltk
+import argparse
 
 from sqlalchemy import create_engine
 from nltk.tokenize import word_tokenize
@@ -15,10 +16,14 @@ from sklearn.pipeline import Pipeline
 from sklearn.metrics import classification_report
 from sklearn.model_selection import GridSearchCV
 
+from settings import DATABASE_FILENAME, MODEL_PICKLE_FILENAME, TABLE_NAME
+
+from typing import Tuple
+
 nltk.download(['punkt', 'wordnet'])
 
 
-def load_data(database_filepath):
+def load_data(database_filepath: str) -> Tuple[pd.Series, pd.Series, np.array]:
     """
     Load data from the sqlite file at `database_filepath`.
     Split into features and labels, then return these along with category columns
@@ -28,14 +33,14 @@ def load_data(database_filepath):
     and the list of categories
     """
     engine = create_engine(f'sqlite:///{database_filepath}')
-    df = pd.read_sql_table('InsertTableName', engine)
+    df = pd.read_sql_table(TABLE_NAME, engine)
     # Split into features and labels
     x = df.message
     y = df.drop(['id', 'message', 'original', 'genre'], axis=1)
     return x, y, y.columns
 
 
-def tokenize(text):
+def tokenize(text: str):
     """
     NLP pre-processing. First tokenize the message text using NLTK word_tokenize.
     Next use the WordNetLemmatizer and lower-case/strip the lemmatized tokens
@@ -54,10 +59,16 @@ def tokenize(text):
     return clean_tokens
 
 
-def build_model():
+def build_model(optimize_parameters=False):
     """
     Build the ML Pipeline. First using CountVector and TfidfTransformer
     and then using RandomForest and a MultiOutputClassifier
+
+    Main parameters for tuning the RF model are n_estimators (10-500),
+     max_depth (2-30 or None), min_samples_split (2-30) the ranges vary by
+     the type of problem you have and cannot be easily predefined.
+
+    :param optimize_parameters: boolean to control whether to grid search or not
     :return: the pipeline
     """
     pipeline = Pipeline([
@@ -66,19 +77,21 @@ def build_model():
                 ('clf', MultiOutputClassifier(RandomForestClassifier()))
                 ])
 
-    # How should I choose these?
-    parameters = {
-        #'vect__ngram_range': ((1, 1), (1, 2)),
-        #'vect__max_df': (0.5, 0.75, 1.0),
-        #'vect__max_features': (None, 5000, 10000),
-        'tfidf__use_idf': (True, False),
-        'clf__estimator__min_samples_split': [2, 3, 4],
-        'clf__estimator__n_estimators': [10, 20],
-    }
+    if optimize_parameters:
+        print('Optimizing parameters...')
+        parameters = {
+            # 'vect__ngram_range': ((1, 1), (1, 2)),
+            # 'vect__max_df': (0.5, 0.75, 1.0),
+            # 'vect__max_features': (None, 5000, 10000),
+            'tfidf__use_idf': (True, False),
+            'clf__estimator__min_samples_split': [2, 3, 4],
+            'clf__estimator__n_estimators': [10, 20],
+        }
 
-    cv = GridSearchCV(pipeline, param_grid=parameters, n_jobs=-1)
+        cv = GridSearchCV(pipeline, param_grid=parameters, n_jobs=-1)
+        return cv
 
-    return cv
+    return pipeline
 
 
 def evaluate_model(model, x_test, y_test, category_names):
@@ -94,11 +107,11 @@ def evaluate_model(model, x_test, y_test, category_names):
     """
 
     y_pred = model.predict(x_test)
-
-    for i, category in enumerate(category_names):
-        print(f'For category {category}:')
-        print(classification_report(y_test[category], y_pred[:, i]))
-        print('-'*50)
+    print(classification_report(y_test, y_pred, target_names=category_names))
+    # for i, category in enumerate(category_names):
+    #     print(f'For category {category}:')
+    #     print(classification_report(y_test[category], y_pred[:, i]))
+    #     print('-'*50)
 
 
 def save_model(model, model_filepath):
@@ -112,35 +125,46 @@ def save_model(model, model_filepath):
     pickle.dump(model, open(model_filepath, 'wb'))
 
 
+def parse_input_arguments():
+    """
+    Use argparse to parse the command line arguments
+
+    Returns:
+        database_filename (str): database filename. Default value DATABASE_FILENAME
+        model_pickle_filename (str): pickle filename. Default value MODEL_PICKLE_FILENAME
+        optimize_params (bool): If True perform grid search of the parameters
+    """
+    parser = argparse.ArgumentParser(description="Disaster Response ML Pipeline")
+    parser.add_argument('--database_filename', type=str, default=DATABASE_FILENAME,
+                        help='Database filename (cleaned messages)')
+    parser.add_argument('--model_pickle_filename', type=str, default=MODEL_PICKLE_FILENAME,
+                        help='Pickle file to save model weights')
+    parser.add_argument('--optimize_params', action="store_true", default=False,
+                        help='Search parameters to find best or not')
+    args = parser.parse_args()
+    return args.database_filename, args.model_pickle_filename, args.optimize_params
+
+
 def main():
-    if len(sys.argv) == 3:
-        database_filepath, model_filepath = sys.argv[1:]
-        print(f'Loading data...\n    DATABASE: {database_filepath}')
-        x_data, y_data, category_names = load_data(database_filepath)
-        x_train, x_test, y_train, y_test = train_test_split(x_data, y_data, test_size=0.2)
-        
-        print('Building model...')
-        model = build_model()
-        
-        print('Training model...')
-        model.fit(x_train, y_train)
+    database_filepath, model_filepath, optimize_parameters = parse_input_arguments()
 
-        print('Grid cv results...')
-        print(sorted(model.cv_results_.keys()))
-        
-        print('Evaluating model...')
-        evaluate_model(model, x_test, y_test, category_names)
+    print(f'Loading data...\n    DATABASE: {database_filepath}')
+    x_data, y_data, category_names = load_data(database_filepath)
+    x_train, x_test, y_train, y_test = train_test_split(x_data, y_data, test_size=0.2)
 
-        print(f'Saving model...\n    MODEL: {model_filepath}')
-        save_model(model, model_filepath)
+    print('Building model...')
+    model = build_model(optimize_parameters=optimize_parameters)
 
-        print('Trained model saved!')
+    print('Training model...')
+    model.fit(x_train, y_train)
 
-    else:
-        print('Please provide the filepath of the disaster messages database '
-              'as the first argument and the filepath of the pickle file to '
-              'save the model to as the second argument. \n\nExample: python '
-              'train_classifier.py ../data/DisasterResponse.db classifier.pkl')
+    print('Evaluating model...')
+    evaluate_model(model, x_test, y_test, category_names)
+
+    print(f'Saving model...\n    MODEL: {model_filepath}')
+    save_model(model, model_filepath)
+
+    print('Trained model saved!')
 
 
 if __name__ == '__main__':

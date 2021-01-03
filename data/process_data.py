@@ -1,6 +1,9 @@
-import sys
+import argparse
 import pandas as pd
 from sqlalchemy import create_engine
+
+
+from settings import DATABASE_FILENAME, TABLE_NAME, MESSAGES_FILENAME, CATEGORIES_FILENAME
 
 
 def load_data(messages_filepath, categories_filepath):
@@ -79,32 +82,44 @@ def save_data(df, database_filename):
     :return: None
     """
     engine = create_engine(f'sqlite:///{database_filename}')
-    df.to_sql('InsertTableName', engine, index=False)  
+    df.to_sql(TABLE_NAME, engine, index=False, if_exists='replace')
+
+
+def parse_input_arguments():
+    """
+    Use argparse to parse the command line arguments
+
+    Returns:
+        messages_filepath (str): messages CSV filename. Default value MESSAGES_FILENAME
+        categories_filepath (str): categories CSV filename. Default value CATEGORIES_FILENAME
+        database_filepath (str): SQLite cleaned db filename. Default value DATABASE_FILENAME
+    """
+    parser = argparse.ArgumentParser(description="Disaster Response ML Pipeline")
+    parser.add_argument('--messages_filepath', type=str, default=MESSAGES_FILENAME,
+                        help='Messages CSV')
+    parser.add_argument('--categories_filepath', type=str, default=CATEGORIES_FILENAME,
+                        help='Categories CSV')
+    parser.add_argument('--database_filepath', type=str, default=DATABASE_FILENAME,
+                        help='Cleaned data database filepath')
+    args = parser.parse_args()
+    return args.messages_filepath, args.categories_filepath, args.database_filepath
 
 
 def main():
-    if len(sys.argv) == 4:
 
-        messages_filepath, categories_filepath, database_filepath = sys.argv[1:]
+    messages_filepath, categories_filepath, database_filepath = parse_input_arguments()
 
-        print(f'Loading data...\n    MESSAGES: {messages_filepath}\n    CATEGORIES: {categories_filepath}')
-        df = load_data(messages_filepath, categories_filepath)
+    print(f'Loading data...\n    MESSAGES: {messages_filepath}\n    CATEGORIES: {categories_filepath}')
+    df = load_data(messages_filepath, categories_filepath)
 
-        print('Cleaning data...')
-        df = clean_data(df)
-        
-        print('Saving data...\n    DATABASE: {}'.format(database_filepath))
-        save_data(df, database_filepath)
-        
-        print('Cleaned data saved to database!')
+    print('Cleaning data...')
+    df = clean_data(df)
+
+    print('Saving data...\n    DATABASE: {}'.format(database_filepath))
+    save_data(df, database_filepath)
+
+    print('Cleaned data saved to database!')
     
-    else:
-        print('Please provide the file paths of the messages and categories '
-              'datasets as the first and second argument respectively, as '
-              'well as the filepath of the database to save the cleaned data '
-              'disaster_messages.csv disaster_categories.csv '
-              'DisasterResponse.db')
-
 
 if __name__ == '__main__':
     main()
