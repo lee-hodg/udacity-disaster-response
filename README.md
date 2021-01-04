@@ -8,7 +8,9 @@ the correct categories so that they can be routed to the relevant organization.
 
 ## Web application screenshots
 
-![Index](images/screenshot1.jpg?raw=true "Dashboard 1")
+![Index](images/screenshot1.png?raw=true "Dashboard 1")
+![Index 2](images/screenshot2.png?raw=true "Dashboard 2")
+![Index 3](images/screenshot3.png?raw=true "Classify Message")
 
 
 ## Project Components
