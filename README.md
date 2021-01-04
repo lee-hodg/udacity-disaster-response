@@ -1,8 +1,7 @@
 # Disaster Response Pipeline Project
 
 This project uses disaster response data from [Figure 8](https://appen.com/).
-During and after a natural disaster there are millions of messages sent to aid organizations
-, right when their resources are already being stretched to the limit. 
+During and after a natural disaster there are millions of messages sent to aid organizations, right when their resources are already being stretched to the limit. 
 The goal of this project is to use NLP techniques to classify those messages into
 the correct categories so that they can be routed to the relevant organization.
 
@@ -91,3 +90,7 @@ python run.py -p../saved_model.pkl -d ../DisasterResponse.db
 
 Go to http://0.0.0.0:3001/
 
+### Built with
+
+Made with <span class="heart">❤</span> during a trip to Brazil and using Flask, NLTK, scikit-learn, numpy,
+pandas, plotly. 
