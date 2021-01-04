@@ -6,6 +6,11 @@ During and after a natural disaster there are millions of messages sent to aid o
 The goal of this project is to use NLP techniques to classify those messages into
 the correct categories so that they can be routed to the relevant organization.
 
+## Web application screenshots
+
+![Index](images/screenshot1.jpg?raw=true "Dashboard 1")
+
+
 ## Project Components
 
 This project has three main components.

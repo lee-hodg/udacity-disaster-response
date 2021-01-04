@@ -1,7 +1,11 @@
 import argparse
 import pandas as pd
 import sys
+import logging
 from sqlalchemy import create_engine
+
+logging.basicConfig(level=logging.DEBUG, format='%(levelname)s %(asctime)s %(message)s')
+logger = logging.getLogger(__name__)
 
 
 sys.path.insert(0, '..')
@@ -10,7 +14,7 @@ sys.path.insert(0, '..')
 from settings import DATABASE_FILENAME, TABLE_NAME, MESSAGES_FILENAME, CATEGORIES_FILENAME
 
 
-def load_data(messages_filepath, categories_filepath):
+def load_data(messages_filepath: str, categories_filepath: str) -> pd.DataFrame:
     """
     Load the messages and categories CSV files into dataframes.
     Merge them on `id` column with an inner join. Each id in the left frame
@@ -26,7 +30,7 @@ def load_data(messages_filepath, categories_filepath):
     return df
 
 
-def clean_data(df):
+def clean_data(df: pd.DataFrame) -> pd.DataFrame:
     """
     We want to one-hot encode the categories ultimately having each as its own column and each row with a 0/1
     if that example belongs to the category.
@@ -77,7 +81,7 @@ def clean_data(df):
     return df
 
 
-def save_data(df, database_filename):
+def save_data(df, database_filename: str):
     """
     Save the pandas dataframe `df` to an sqlite database with filename `database_filename`
 
@@ -113,16 +117,16 @@ def main():
 
     messages_filepath, categories_filepath, database_filepath = parse_input_arguments()
 
-    print(f'Loading data...\n    MESSAGES: {messages_filepath}\n    CATEGORIES: {categories_filepath}')
+    logging.debug(f'Loading data...\n    MESSAGES: {messages_filepath}\n    CATEGORIES: {categories_filepath}')
     df = load_data(messages_filepath, categories_filepath)
 
-    print('Cleaning data...')
+    logging.debug('Cleaning data...')
     df = clean_data(df)
 
-    print('Saving data...\n    DATABASE: {}'.format(database_filepath))
+    logging.debug('Saving data...\n    DATABASE: {}'.format(database_filepath))
     save_data(df, database_filepath)
 
-    print('Cleaned data saved to database!')
+    logging.debug('Cleaned data saved to database!')
     
 
 if __name__ == '__main__':
