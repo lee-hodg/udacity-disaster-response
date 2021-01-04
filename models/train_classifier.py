@@ -3,60 +3,102 @@ import pandas as pd
 import numpy as np
 import nltk
 import argparse
+import sys
 
 from sqlalchemy import create_engine
-from nltk.tokenize import word_tokenize
-from nltk.stem import WordNetLemmatizer
+
 
 from sklearn.multioutput import MultiOutputClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.feature_extraction.text import CountVectorizer, TfidfTransformer
+from sklearn.feature_extraction.text import TfidfVectorizer
+
 from sklearn.pipeline import Pipeline
 from sklearn.metrics import classification_report
 from sklearn.model_selection import GridSearchCV
-
-from settings import DATABASE_FILENAME, MODEL_PICKLE_FILENAME, TABLE_NAME
+from sklearn.utils import resample
 
 from typing import Tuple
 
-nltk.download(['punkt', 'wordnet'])
+nltk.data.find('tokenizers/punkt')
+nltk.data.find('tokenizers/punkt')
+nltk.data.find('tokenizers/punkt')
 
 
-def load_data(database_filepath: str) -> Tuple[pd.Series, pd.Series, np.array]:
+# Just to import settings from parent
+sys.path.insert(0, '..')
+
+from settings import DATABASE_FILENAME, MODEL_PICKLE_FILENAME, TABLE_NAME
+from utils import tokenize
+
+
+def up_sample(df):
+    """
+    The dataset is very imbalanced with many more messages having the aid category label
+    than for example the shop label. This can lead to issues if the ML model just tries
+    to classify based on accuracy, since for example if it always set shop=0 it would be accurate
+    maybe 90% of the time, but not because it's a good model, just because 90% (or w/e)
+    of the messages don't have that label.
+
+    We can try to address this by up-sampling: we look for messages that have at least 1 category but not
+    any of the N most popular categories, then we resample those messages to the level of the most popular category
+
+    See also https://elitedatascience.com/imbalanced-classes
+
+    :return: upsampled df
+    """
+    # Shuffle
+    df_temp = df.sample(frac=1, random_state=0)
+
+    # Only related == 1 messages have categories anyway
+    categories = df_temp[df_temp.related == 1].drop(columns=['id', 'message', 'original', 'genre', 'related'])
+
+    # How many messages labeled by each category
+    cat_counts = categories.sum().sort_values(ascending=False)
+
+    # Set the sampling number equal to the most popular category
+    # (aid 11048, weather 7485,....shops 308, offer 306)
+    upsample_number = cat_counts[0]
+
+    # Choose the most  popular categories
+    popular_cats = cat_counts.index[:3].to_list()
+
+    # Messages with no labels in popular cats but at least 1 category (approx 362 of these)
+    minority_messages = categories[(~categories[popular_cats].any(axis=1)) & (categories.sum(axis=1) > 0)]
+
+    df_minority = df.loc[minority_messages.index]
+    df_majority = df.loc[~df.index.isin(minority_messages.index)]
+
+    df_minority_upsampled = resample(df_minority,
+                                     replace=True,                 # sample with replacement
+                                     n_samples=upsample_number,    # to match majority class
+                                     )
+
+    # Combine majority class with upsampled minority class
+    df_upsampled = pd.concat([df_majority, df_minority_upsampled])
+
+    return df_upsampled
+
+
+def load_data(database_filepath: str, up_sample: bool) -> Tuple[pd.Series, pd.Series, np.array]:
     """
     Load data from the sqlite file at `database_filepath`.
     Split into features and labels, then return these along with category columns
 
     :param database_filepath: location of the sqlite db file
+    :param up_sample: should we upsample the minority category messages in the df?
     :return: the features (the message) along with the target labels (the categories)
     and the list of categories
     """
     engine = create_engine(f'sqlite:///{database_filepath}')
     df = pd.read_sql_table(TABLE_NAME, engine)
+    if up_sample:
+        df = up_sample(df)
     # Split into features and labels
     x = df.message
     y = df.drop(['id', 'message', 'original', 'genre'], axis=1)
     return x, y, y.columns
-
-
-def tokenize(text: str):
-    """
-    NLP pre-processing. First tokenize the message text using NLTK word_tokenize.
-    Next use the WordNetLemmatizer and lower-case/strip the lemmatized tokens
-
-    :param text: the text document (message)
-    :return: a list of cleaned tokens representing the message
-    """
-    tokens = word_tokenize(text)
-    lemmatizer = WordNetLemmatizer()
-
-    clean_tokens = []
-    for tok in tokens:
-        clean_tok = lemmatizer.lemmatize(tok).lower().strip()
-        clean_tokens.append(clean_tok)
-
-    return clean_tokens
 
 
 def build_model(optimize_parameters=False):
@@ -74,18 +116,21 @@ def build_model(optimize_parameters=False):
     pipeline = Pipeline([
                 ('vect', CountVectorizer(tokenizer=tokenize)),
                 ('tfidf', TfidfTransformer()),
+                # ('vect_tfdif', TfidfVectorizer(tokenizer=tokenize()))
                 ('clf', MultiOutputClassifier(RandomForestClassifier()))
                 ])
 
     if optimize_parameters:
         print('Optimizing parameters...')
         parameters = {
-            # 'vect__ngram_range': ((1, 1), (1, 2)),
-            # 'vect__max_df': (0.5, 0.75, 1.0),
-            # 'vect__max_features': (None, 5000, 10000),
-            'tfidf__use_idf': (True, False),
+            'vect__ngram_range': ((1, 1), (1, 2)),
+            'vect__max_df': (0.5, 0.75, 1.0),
+            'vect__max_features': (None, 5000, 10000),
+            'tfidf_vect__max_df': (0.75, 1.0),
+            # 'tfidf_vect__max_features': (None, 5000, 10000),
+            # 'tfidf_vect__ngram_range': ((1, 1), (1, 2)),   # unigrams or bigrams
             'clf__estimator__min_samples_split': [2, 3, 4],
-            'clf__estimator__n_estimators': [10, 20],
+            'clf__estimator__n_estimators': [10, 30],
         }
 
         cv = GridSearchCV(pipeline, param_grid=parameters, n_jobs=-1)
@@ -108,10 +153,6 @@ def evaluate_model(model, x_test, y_test, category_names):
 
     y_pred = model.predict(x_test)
     print(classification_report(y_test, y_pred, target_names=category_names))
-    # for i, category in enumerate(category_names):
-    #     print(f'For category {category}:')
-    #     print(classification_report(y_test[category], y_pred[:, i]))
-    #     print('-'*50)
 
 
 def save_model(model, model_filepath):
@@ -141,15 +182,17 @@ def parse_input_arguments():
                         help='Pickle file to save model weights')
     parser.add_argument('--optimize_params', action="store_true", default=False,
                         help='Search parameters to find best or not')
+    parser.add_argument('--upsample', action="store_true", default=False,
+                        help='Upsample the minority messages')
     args = parser.parse_args()
-    return args.database_filename, args.model_pickle_filename, args.optimize_params
+    return args.database_filename, args.model_pickle_filename, args.optimize_params, args.upsample
 
 
 def main():
-    database_filepath, model_filepath, optimize_parameters = parse_input_arguments()
+    database_filepath, model_filepath, optimize_parameters, up_sample = parse_input_arguments()
 
     print(f'Loading data...\n    DATABASE: {database_filepath}')
-    x_data, y_data, category_names = load_data(database_filepath)
+    x_data, y_data, category_names = load_data(database_filepath, up_sample=up_sample)
     x_train, x_test, y_train, y_test = train_test_split(x_data, y_data, test_size=0.2)
 
     print('Building model...')
@@ -157,6 +200,10 @@ def main():
 
     print('Training model...')
     model.fit(x_train, y_train)
+
+    if optimize_parameters:
+        print('Optimized params were: \n')
+        print(model.best_estimator_.get_params())
 
     print('Evaluating model...')
     evaluate_model(model, x_test, y_test, category_names)

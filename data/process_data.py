@@ -1,6 +1,10 @@
 import argparse
 import pandas as pd
+import sys
 from sqlalchemy import create_engine
+
+
+sys.path.insert(0, '..')
 
 
 from settings import DATABASE_FILENAME, TABLE_NAME, MESSAGES_FILENAME, CATEGORIES_FILENAME
