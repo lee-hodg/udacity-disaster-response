@@ -99,11 +99,11 @@ def parse_input_arguments():
         database_filepath (str): SQLite cleaned db filename. Default value DATABASE_FILENAME
     """
     parser = argparse.ArgumentParser(description="Disaster Response ML Pipeline")
-    parser.add_argument('--messages_filepath', type=str, default=MESSAGES_FILENAME,
+    parser.add_argument('-m', '--messages_filepath', type=str, default=MESSAGES_FILENAME,
                         help='Messages CSV')
-    parser.add_argument('--categories_filepath', type=str, default=CATEGORIES_FILENAME,
+    parser.add_argument('-c', '--categories_filepath', type=str, default=CATEGORIES_FILENAME,
                         help='Categories CSV')
-    parser.add_argument('--database_filepath', type=str, default=DATABASE_FILENAME,
+    parser.add_argument('-d', '--database_filepath', type=str, default=DATABASE_FILENAME,
                         help='Cleaned data database filepath')
     args = parser.parse_args()
     return args.messages_filepath, args.categories_filepath, args.database_filepath

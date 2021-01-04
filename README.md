@@ -32,18 +32,51 @@ The ETL script does the following:
 - A Flask web app to display various charts about the data
 - A form that takes a new message and classifies it by categories in real-time.
 
+## Files in this repository 
+
+- app
+  - templates
+    - go.html  # classification result page of web app
+    - master.html  # main page of web app
+  - run.py  # Flask web app
+- data
+  - __init__.py
+  - disaster_categories.csv   # data to process
+  - diaster_messages.csv  # data to process
+  - process_data.py  # ETL script
+- models
+  - __init__.py 
+  - train_classifier.py   # ML pipeline script
+  
+- README.md   # This README
+- requirements.txt   # Third-party dependencies
+- settings.py  # Common config settings
+- utils.py   # Re-usable functionality
 
 ## Instructions
 
 1. Run the following commands in the project's root directory to set up your database and model.
+   
+### To run ETL pipeline that cleans data and stores in database
 
-    - To run ETL pipeline that cleans data and stores in database
-        `python data/process_data.py data/disaster_messages.csv data/disaster_categories.csv data/DisasterResponse.db`
-    - To run ML pipeline that trains classifier and saves
-        `python models/train_classifier.py data/DisasterResponse.db models/classifier.pkl`
+```bash
+cd data
+python process_data.py --m disaster_messages.csv -c disaster_categories.csv --d ../DisasterResponse.db
+```
 
-2. Run the following command in the app's directory to run your web app.
-    `python run.py`
+### To run ML pipeline that trains classifier and saves
 
-3. Go to http://0.0.0.0:3001/
+```bash
+cd models
+python train_classifier.py -d '../DisasterResponse.db' -p '../saved_model.pkl'
+```
+
+### Run the following command in the app's directory to run your web app.
+
+```bash
+cd app
+python run.py -p../saved_model.pkl -d ../DisasterResponse.db
+```
+
+Go to http://0.0.0.0:3001/
 

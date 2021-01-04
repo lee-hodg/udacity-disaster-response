@@ -3,6 +3,7 @@ import plotly
 import pandas as pd
 import joblib
 import sys
+import argparse
 
 from flask import Flask
 from flask import render_template, request
@@ -15,12 +16,33 @@ from settings import DATABASE_FILENAME, TABLE_NAME, MODEL_PICKLE_FILENAME
 
 app = Flask(__name__)
 
+
+def parse_input_arguments():
+    """
+    Use argparse to parse the command line arguments
+
+    Returns:
+        messages_filepath (str): messages CSV filename. Default value MESSAGES_FILENAME
+        categories_filepath (str): categories CSV filename. Default value CATEGORIES_FILENAME
+        database_filepath (str): SQLite cleaned db filename. Default value DATABASE_FILENAME
+    """
+    parser = argparse.ArgumentParser(description="Disaster Response ML Pipeline")
+    parser.add_argument('-p', '--picked_model_filepath', type=str, default=MODEL_PICKLE_FILENAME,
+                        help='Pickled model')
+    parser.add_argument('-d', '--database_filepath', type=str, default=DATABASE_FILENAME,
+                        help='Cleaned data database filepath')
+    args = parser.parse_args()
+    return args.picked_model_filepath, args.database_filepath
+
+
+picked_model_filepath, database_filepath = parse_input_arguments()
+
 # load data
-engine = create_engine(f'sqlite:///{DATABASE_FILENAME}')
+engine = create_engine(f'sqlite:///{database_filepath}')
 df = pd.read_sql_table(TABLE_NAME, engine)
 
 # load model
-model = joblib.load(MODEL_PICKLE_FILENAME)
+model = joblib.load(picked_model_filepath)
 
 
 # index webpage displays cool visuals and receives user input text for model
@@ -129,6 +151,7 @@ def go():
 
 
 def main():
+
     app.run(host='0.0.0.0', port=3001, debug=True)
 
 

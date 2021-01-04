@@ -2,6 +2,7 @@
 .idea/
 .vscode/
 .venv
+venv/**
 venv/
 .env
 .envrc

@@ -176,13 +176,13 @@ def parse_input_arguments():
         optimize_params (bool): If True perform grid search of the parameters
     """
     parser = argparse.ArgumentParser(description="Disaster Response ML Pipeline")
-    parser.add_argument('--database_filename', type=str, default=DATABASE_FILENAME,
+    parser.add_argument('-d', '--database_filename', type=str, default=DATABASE_FILENAME,
                         help='Database filename (cleaned messages)')
-    parser.add_argument('--model_pickle_filename', type=str, default=MODEL_PICKLE_FILENAME,
+    parser.add_argument('-p', '--model_pickle_filename', type=str, default=MODEL_PICKLE_FILENAME,
                         help='Pickle file to save model weights')
-    parser.add_argument('--optimize_params', action="store_true", default=False,
+    parser.add_argument('-o', '--optimize_params', action="store_true", default=False,
                         help='Search parameters to find best or not')
-    parser.add_argument('--upsample', action="store_true", default=False,
+    parser.add_argument('-u', '--upsample', action="store_true", default=False,
                         help='Upsample the minority messages')
     args = parser.parse_args()
     return args.database_filename, args.model_pickle_filename, args.optimize_params, args.upsample
