@@ -71,6 +71,10 @@ cd models
 python train_classifier.py -d '../DisasterResponse.db' -p '../saved_model.pkl'
 ```
 
+Optionally you can specify the `-o` to run a grid search to optimize the parameters, and
+also `-u` to "upsample" the test data to try and address the imbalance in category labels
+(i.e. many messages labeled with some categories and very few with other categories).
+
 ### Run the following command in the app's directory to run your web app.
 
 ```bash
