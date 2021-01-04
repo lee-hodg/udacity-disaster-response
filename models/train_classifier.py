@@ -4,6 +4,7 @@ import numpy as np
 import nltk
 import argparse
 import sys
+import logging
 
 from sqlalchemy import create_engine
 
@@ -24,6 +25,10 @@ from typing import Tuple
 nltk.data.find('tokenizers/punkt')
 nltk.data.find('tokenizers/punkt')
 nltk.data.find('tokenizers/punkt')
+
+
+logging.basicConfig(level=logging.DEBUG, format='%(levelname)s %(asctime)s %(message)s')
+logger = logging.getLogger(__name__)
 
 
 # Just to import settings from parent
@@ -52,7 +57,7 @@ def up_sample(df):
     df_temp = df.sample(frac=1, random_state=0)
 
     # Only related == 1 messages have categories anyway
-    categories = df_temp[df_temp.related == 1].drop(columns=['id', 'message', 'original', 'genre', 'related'])
+    categories = df_temp[df_temp.related == 1].drop(columns=['message', 'related'])
 
     # How many messages labeled by each category
     cat_counts = categories.sum().sort_values(ascending=False)
@@ -81,20 +86,17 @@ def up_sample(df):
     return df_upsampled
 
 
-def load_data(database_filepath: str, up_sample: bool) -> Tuple[pd.Series, pd.Series, np.array]:
+def load_data(database_filepath: str) -> Tuple[pd.Series, pd.Series, np.array]:
     """
     Load data from the sqlite file at `database_filepath`.
     Split into features and labels, then return these along with category columns
 
     :param database_filepath: location of the sqlite db file
-    :param up_sample: should we upsample the minority category messages in the df?
     :return: the features (the message) along with the target labels (the categories)
     and the list of categories
     """
     engine = create_engine(f'sqlite:///{database_filepath}')
     df = pd.read_sql_table(TABLE_NAME, engine)
-    if up_sample:
-        df = up_sample(df)
     # Split into features and labels
     x = df.message
     y = df.drop(['id', 'message', 'original', 'genre'], axis=1)
@@ -121,19 +123,19 @@ def build_model(optimize_parameters=False):
                 ])
 
     if optimize_parameters:
-        print('Optimizing parameters...')
+        logger.debug('Optimizing parameters...')
         parameters = {
             'vect__ngram_range': ((1, 1), (1, 2)),
             'vect__max_df': (0.5, 0.75, 1.0),
             'vect__max_features': (None, 5000, 10000),
-            'tfidf_vect__max_df': (0.75, 1.0),
+            # 'tfidf_vect__max_df': (0.75, 1.0),
             # 'tfidf_vect__max_features': (None, 5000, 10000),
             # 'tfidf_vect__ngram_range': ((1, 1), (1, 2)),   # unigrams or bigrams
             'clf__estimator__min_samples_split': [2, 3, 4],
             'clf__estimator__n_estimators': [10, 30],
         }
 
-        cv = GridSearchCV(pipeline, param_grid=parameters, n_jobs=-1)
+        cv = GridSearchCV(pipeline, param_grid=parameters, n_jobs=-1, verbose=3)
         return cv
 
     return pipeline
@@ -152,7 +154,7 @@ def evaluate_model(model, x_test, y_test, category_names):
     """
 
     y_pred = model.predict(x_test)
-    print(classification_report(y_test, y_pred, target_names=category_names))
+    logger.debug(classification_report(y_test, y_pred, target_names=category_names))
 
 
 def save_model(model, model_filepath):
@@ -182,36 +184,44 @@ def parse_input_arguments():
                         help='Pickle file to save model weights')
     parser.add_argument('-o', '--optimize_params', action="store_true", default=False,
                         help='Search parameters to find best or not')
-    parser.add_argument('-u', '--upsample', action="store_true", default=False,
+    parser.add_argument('-u', '--should_up_sample', action="store_true", default=False,
                         help='Upsample the minority messages')
     args = parser.parse_args()
-    return args.database_filename, args.model_pickle_filename, args.optimize_params, args.upsample
+    return args.database_filename, args.model_pickle_filename, args.optimize_params, args.should_up_sample
 
 
 def main():
-    database_filepath, model_filepath, optimize_parameters, up_sample = parse_input_arguments()
+    database_filepath, model_filepath, optimize_parameters, should_up_sample = parse_input_arguments()
 
-    print(f'Loading data...\n    DATABASE: {database_filepath}')
-    x_data, y_data, category_names = load_data(database_filepath, up_sample=up_sample)
+    logger.debug(f'Loading data...\n    DATABASE: {database_filepath}')
+    x_data, y_data, category_names = load_data(database_filepath)
     x_train, x_test, y_train, y_test = train_test_split(x_data, y_data, test_size=0.2)
 
-    print('Building model...')
+    # Upsample
+    if should_up_sample:
+        logger.debug('Upsample the training data..')
+        train_df = pd.concat([x_train, y_train], axis=1)
+        upsampled_train_df = up_sample(train_df)
+        x_train = upsampled_train_df.message
+        y_train = upsampled_train_df.drop(['message'], axis=1)
+
+    logger.debug('Building model...')
     model = build_model(optimize_parameters=optimize_parameters)
 
-    print('Training model...')
+    logger.debug('Training model...')
     model.fit(x_train, y_train)
 
     if optimize_parameters:
-        print('Optimized params were: \n')
-        print(model.best_estimator_.get_params())
+        logger.debug('Optimized params were: \n')
+        logger.debug(model.best_estimator_.get_params())
 
-    print('Evaluating model...')
+    logger.debug('Evaluating model...')
     evaluate_model(model, x_test, y_test, category_names)
 
-    print(f'Saving model...\n    MODEL: {model_filepath}')
+    logger.debug(f'Saving model...\n    MODEL: {model_filepath}')
     save_model(model, model_filepath)
 
-    print('Trained model saved!')
+    logger.debug('Trained model saved!')
 
 
 if __name__ == '__main__':
